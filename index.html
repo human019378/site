@@ -306,3 +306,42 @@
     document.getElementById('likeBtn').addEventListener('click', ()=> swipe('right'));
     document.getElementById('passBtn').addEventListener('click', ()=> swipe('left'));
     document.getElementById('rewindBtn').addEventListener('click', rewind
+
+      
+      function swipe(direction) {
+      const card = deckEl.lastElementChild; // Get the top card
+      if (!card) return; // No card to swipe
+
+      // Trigger the appropriate swipe action
+      const event = new Event('pointerup');
+      card.dispatchEvent(event); // Simulate pointer up to trigger the swipe logic
+      // Add any additional logic here if needed
+    }
+
+    function rewind() {
+      if (history.length === 0) return; // Nothing to rewind
+      const lastAction = history.pop(); // Get the last action
+      const card = document.createElement('article'); // Create a new card element
+      card.className = 'card';
+      card.innerHTML = `
+        <div class="badge like">LIKE</div>
+        <div class="badge pass">PASS</div>
+        <img alt="${lastAction.caption}" src="${lastAction.src}" />
+        <div class="gradient" aria-hidden="true"></div>
+        <div class="meta">
+          <div>
+            <div class="title">${lastAction.caption}</div>
+            <div class="index-pill">${lastAction.index + 1} / ${photos.length}</div>
+          </div>
+        </div>`;
+      deckEl.appendChild(card); // Add the card back to the deck
+      attachTopCard(); // Attach the swipe functionality to the new top card
+      updateDots(); // Update the dots
+    }
+
+    // Initialize the deck on page load
+    buildDeck();
+  </script>
+</body>
+</html>
+                                                    
