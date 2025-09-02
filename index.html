@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>SwipeStack • Photo Gallery</title>
+  <meta name="description" content="An Instagram-like swipe gallery with Tinder-style gestures." />
+  <style>
+    :root{
+      --bg: #0b0f14;
+      --card-bg: #0e141b;
+      --text: #e6edf3;
+      --muted: #9aa6b2;
+      --accent: #3b82f6;
+      --danger: #ef4444;
+      --success: #22c55e;
+      --shadow: 0 20px 40px rgba(0,0,0,.35);
+      --radius: 22px;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0;
+      background: radial-gradient(1200px 800px at 80% -10%, rgba(59,130,246,.15), transparent 50%),
+                  radial-gradient(1000px 700px at 0% 120%, rgba(34,197,94,.08), transparent 50%),
+                  var(--bg);
+      color:var(--text);
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
+      -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;
+      display:flex; align-items:center; justify-content:center;
+      padding: 24px;
+    }
+    .app{width:min(100%, 540px)}
+    header{display:flex; align-items:center; justify-content:space-between; margin-bottom:16px}
+    .brand{display:flex; align-items:center; gap:10px}
+    .brand .logo{
+      width:36px; height:36px; border-radius:12px;
+      background: linear-gradient(135deg, #f43f5e, #f59e0b, #10b981, #3b82f6);
+      filter: saturate(120%);
+      box-shadow: 0 8px 24px rgba(0,0,0,.35);
+    }
+    h1{font-size:18px; margin:0; letter-spacing:.2px}
+    .muted{color:var(--muted); font-size:12px}
+
+    .deck{
+      position:relative;
+      height: 72vh; max-height: 720px; min-height: 460px;
+    }
+
+    .card{
+      position:absolute; inset:0; border-radius: var(--radius);
+      background: var(--card-bg);
+      overflow:hidden; box-shadow: var(--shadow);
+      touch-action: none; /* so we can handle gestures */
+      user-select:none;
+      display:flex; align-items:flex-end; justify-content:stretch;
+      transform-origin: 50% 100%;
+      will-change: transform, opacity;
+    }
+
+    .card img{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
+    .gradient{ position:absolute; inset:0; background: linear-gradient(to top, rgba(0,0,0,.6), rgba(0,0,0,.25) 40%, transparent 70%); }
+
+    .meta{
+      position:relative; z-index:2; width:100%; padding:18px; display:flex; align-items:flex-end; justify-content:space-between; gap:12px;
+    }
+    .title{font-weight:700; font-size:16px}
+    .index-pill{font-size:12px; color:#cbd5e1; background: rgba(0,0,0,.35); border:1px solid rgba(255,255,255,.08); padding:6px 10px; border-radius:999px}
+
+    .toolbar{
+      margin-top:16px; display:flex; align-items:center; justify-content:center; gap:16px;
+    }
+    .btn{
+      appearance:none; border:0; cursor:pointer; padding:16px; border-radius: 999px;
+      background:#0f172a; box-shadow: 0 6px 18px rgba(0,0,0,.35), inset 0 0 0 1px rgba(255,255,255,.06);
+      transition: transform .12s ease, box-shadow .2s ease, background .2s ease;
+    }
+    .btn:active{ transform: scale(.96) }
+    .btn svg{ width:28px; height:28px; display:block }
+    .btn.like{ background: linear-gradient(135deg, rgba(34,197,94,.2), rgba(34,197,94,.08)); }
+    .btn.pass{ background: linear-gradient(135deg, rgba(239,68,68,.2), rgba(239,68,68,.08)); }
+    .btn.rewind{ background: linear-gradient(135deg, rgba(59,130,246,.2), rgba(59,130,246,.08)); }
+
+    .dots{ display:flex; align-items:center; justify-content:center; gap:8px; margin-top:12px }
+    .dot{ width:8px; height:8px; border-radius:999px; background:#1f2937; opacity:.7 }
+    .dot.active{ background:#e5e7eb; opacity:1 }
+
+    .badge{
+      position:absolute; top:14px; left:14px; z-index:2; padding:8px 12px; border-radius:999px; font-weight:700; letter-spacing:.3px;
+      color:white; mix-blend:screen; text-shadow: 0 2px 8px rgba(0,0,0,.6);
+      transform: rotate(-10deg); opacity:0; transition: opacity .15s ease;
+    }
+    .badge.like{ background: rgba(34,197,94,.85); }
+    .badge.pass{ background: rgba(239,68,68,.85); right:14px; left:auto; transform: rotate(10deg); }
+
+    footer{ margin-top:18px; text-align:center; font-size:12px; color:var(--muted) }
+    a{ color:#8ab4ff; text-decoration:none }
+    a:hover{ text-decoration:underline }
+  </style>
+</head>
+<body>
+  <div class="app" role="application" aria-label="SwipeStack Photo Gallery">
+    <header>
+      <div class="brand">
+        <div class="logo" aria-hidden="true"></div>
+        <div>
+          <h1>SwipeStack</h1>
+          <div class="muted">Swipe left/right • Keys: ⟵ ⟶</div>
+        </div>
+      </div>
+      <div class="muted">15 photos</div>
+    </header>
+
+    <main class="deck" id="deck" aria-live="polite"></main>
+
+    <div class="toolbar">
+      <button class="btn pass" id="passBtn" aria-label="Pass (Left)">
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6.225 4.811a1 1 0 0 1 1.414 0L12 9.172l4.361-4.361a1 1 0 1 1 1.414 1.414L13.414 10.586l4.361 4.361a1 1 0 0 1-1.414 1.414L12 12l-4.361 4.361a1 1 0 0 1-1.414-1.414l4.361-4.361-4.361-4.361a1 1 0 0 1 0-1.414z"/></svg>
+      </button>
+      <button class="btn rewind" id="rewindBtn" aria-label="Rewind">
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 5v3l-4-4 4-4v3c5.523 0 10 4.477 10 10a10 10 0 0 1-2.929 7.071l-1.414-1.414A8 8 0 0 0 12 7z"/></svg>
+      </button>
+      <button class="btn like" id="likeBtn" aria-label="Like (Right)">
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12.001 4.529c2.349-2.532 6.146-2.532 8.495 0 2.362 2.546 2.362 6.67 0 9.216l-7.081 7.64a2 2 0 0 1-2.828 0l-7.081-7.64c-2.362-2.546-2.362-6.67 0-9.216 2.349-2.532 6.146-2.532 8.495 0z"/></svg>
+      </button>
+    </div>
+
+    <div class="dots" id="dots" aria-label="Progress indicators"></div>
+
+    <footer>
+      Built for GitHub Pages • Happy one year my bubbaaaa
+    </footer>
+  </div>
+
+  <script>
+    // --- Configuration ------------------------------------------------------
+const photos = [
+  "https://i.postimg.cc/cHSHz1y8/F6-E50-FBB-A7-F1-4-BB7-B1-CA-834-E81-BED127.png",
+  "https://i.postimg.cc/0j5N8tNk/IMG-0075.jpg",
+  "https://i.postimg.cc/cHBHGq0k/IMG-0128.jpg",
+  "https://i.postimg.cc/kGjgDxVx/IMG-0240.jpg",
+  "https://i.postimg.cc/sfKXnRnv/IMG-0265.jpg",
+  "https://i.postimg.cc/CLQKgsp0/IMG-0287.jpg",
+  "https://i.postimg.cc/RZJZVJvH/IMG-0299.jpg",
+  "https://i.postimg.cc/Prxq9FcK/IMG-0266-Copy.jpg",
+  "https://i.postimg.cc/Lsd6q4s0/IMG-0422.jpg",
+  "https://i.postimg.cc/W3TNn9gG/IMG-0516-Copy.jpg",
+  "https://i.postimg.cc/XJLVDwkT/IMG-0644.jpg",
+  "https://i.postimg.cc/T1HTTfS0/IMG-8844.jpg",
+  "https://i.postimg.cc/Y0SpchXj/IMG-8954.jpg",
+  "https://i.postimg.cc/mZdLYyD9/IMG-9409.jpg",
+  "https://i.postimg.cc/9FrWJwRn/IMG-9919.jpg"
+];
+
+// Initialize the deck on page load
+buildDeck();
+
+
+  // Optional captions (same length as photos). Leave empty strings to hide.
+  const captions = [
+    "Photo 1","Photo 2","Photo 3","Photo 4","Photo 5",
+    "Photo 6","Photo 7","Photo 8","Photo 9","Photo 10",
+    "Photo 11","Photo 12","Photo 13","Photo 14","Photo 15"
+  ];
+
+    // --- Core swipe deck logic ---------------------------------------------
+    const deckEl = document.getElementById('deck');
+    const dotsEl = document.getElementById('dots');
+    let history = []; // stack of removed cards for rewind
+
+    function createDots(count){
+      dotsEl.innerHTML = '';
+      for(let i=0;i<count;i++){
+        const d = document.createElement('div'); d.className = 'dot' + (i===0?' active':'');
+        dotsEl.appendChild(d);
+      }
+    }
+
+    function updateDots(){
+      const cards = [...deckEl.children];
+      const topIndex = photos.length - cards.length; // 0-based index of current
+      [...dotsEl.children].forEach((dot, i)=>{
+        dot.classList.toggle('active', i === topIndex);
+      });
+    }
+
+    function buildDeck(){
+      deckEl.innerHTML = '';
+      createDots(photos.length);
+
+      photos.forEach((src, i)=>{
+        const card = document.createElement('article');
+        card.className = 'card';
+        card.setAttribute('role','group');
+        card.setAttribute('aria-roledescription','slide');
+        card.setAttribute('aria-label', `Photo ${i+1} of ${photos.length}`);
+
+        card.innerHTML = `
+          <div class="badge like">LIKE</div>
+          <div class="badge pass">PASS</div>
+          <img alt="Photo ${i+1}" src="${src}" />
+          <div class="gradient" aria-hidden="true"></div>
+          <div class="meta">
+            <div>
+              <div class="title">${captions[i] || ''}</div>
+              <div class="index-pill">${i+1} / ${photos.length}</div>
+            </div>
+          </div>`;
+
+        deckEl.appendChild(card);
+      });
+
+      // Stack visual offset for depth
+      [...deckEl.children].forEach((el, idx, arr)=>{
+        const depth = arr.length - idx - 1; // top is last child
+        el.style.transform = `translateY(${depth*4}px) scale(${1 - depth*0.02})`;
+        el.style.zIndex = String(100 + idx);
+      });
+
+      attachTopCard();
+      updateDots();
+    }
+
+    function attachTopCard(){
+      const card = deckEl.lastElementChild; // top card
+      if(!card) return;
+
+      let startX=0, startY=0, currentX=0, currentY=0, dragging=false;
+
+      const likeBadge = card.querySelector('.badge.like');
+      const passBadge = card.querySelector('.badge.pass');
+
+      const pointerDown = (e)=>{
+        dragging = true;
+        const pt = getPoint(e);
+        startX = currentX = pt.x; startY = currentY = pt.y;
+        card.setPointerCapture?.(e.pointerId ?? 0);
+      };
+
+      const pointerMove = (e)=>{
+        if(!dragging) return;
+        const {x, y} = getPoint(e);
+        const dx = x - startX; const dy = y - startY;
+        const rot = dx / 14; // tilt factor
+        card.style.transition = 'transform 0s';
+        card.style.transform = `translate(${dx}px, ${dy}px) rotate(${rot}deg)`;
+
+        const likeOpacity = clamp((dx-30)/120, 0, 1);
+        const passOpacity = clamp((-dx-30)/120, 0, 1);
+        likeBadge.style.opacity = likeOpacity;
+        passBadge.style.opacity = passOpacity;
+      };
+
+      const pointerUp = (e)=>{
+        if(!dragging) return;
+        dragging = false;
+        const {x, y} = getPoint(e);
+        const dx = x - startX; const dy = y - startY;
+        const velocity = Math.hypot(dx, dy);
+        const threshold = 120; // pixels
+
+        likeBadge.style.opacity = 0; passBadge.style.opacity = 0;
+
+        if(Math.abs(dx) > threshold || velocity > 220){
+          // fling off
+          const direction = Math.sign(dx) || 1; // default right
+          const toX = direction * (window.innerWidth + 200);
+          const toY = dy * 1.1;
+          card.style.transition = 'transform .32s cubic-bezier(.2,.7,.2,1)';
+          card.style.transform = `translate(${toX}px, ${toY}px) rotate(${direction*25}deg)`;
+          const src = card.querySelector('img')?.src || '';
+          history.push({ src, caption: card.querySelector('.title')?.textContent || '', index: photos.length - deckEl.children.length });
+          setTimeout(()=>{ card.remove(); attachTopCard(); updateDots(); }, 320);
+        } else {
+          // snap back
+          card.style.transition = 'transform .25s cubic-bezier(.2,.7,.2,1)';
+          card.style.transform = '';
+        }
+      };
+
+      enablePointer(card, pointerDown, pointerMove, pointerUp);
+    }
+
+    function enablePointer(target, down, move, up){
+      // Use Pointer Events when available; otherwise fall back to mouse/touch
+      if(window.PointerEvent){
+        target.addEventListener('pointerdown', down);
+        window.addEventListener('pointermove', move);
+        window.addEventListener('pointerup', up);
+        window.addEventListener('pointercancel', up);
+      } else {
+        target.addEventListener('mousedown', down);
+        window.addEventListener('mousemove', move);
+        window.addEventListener('mouseup', up);
+        target.addEventListener('touchstart', (e)=>down(e.changedTouches[0]));
+        window.addEventListener('touchmove', (e)=>move(e.changedTouches[0]));
+        window.addEventListener('touchend', (e)=>up(e.changedTouches[0]));
+      }
+    }
+
+    function getPoint(e){
+      if('clientX' in e) return {x:e.clientX, y:e.clientY};
+      if(e.touches && e.touches[0]) return {x:e.touches[0].clientX, y:e.touches[0].clientY};
+      return {x:0,y:0};
+    }
+
+    function clamp(v, min, max){ return Math.min(max, Math.max(min, v)); }
+
+    // --- Controls -----------------------------------------------------------
+    document.getElementById('likeBtn').addEventListener('click', ()=> swipe('right'));
+    document.getElementById('passBtn').addEventListener('click', ()=> swipe('left'));
+   document.getElementById('rewindBtn').addEventListener('click', rewind);
+
+    
+      function swipe(direction) {
+      const card = deckEl.lastElementChild; // Get the top card
+      if (!card) return; // No card to swipe
+
+      // Trigger the appropriate swipe action
+      const event = new Event('pointerup');
+      card.dispatchEvent(event); // Simulate pointer up to trigger the swipe logic
+      // Add any additional logic here if needed
+    }
+
+    function rewind() {
+      if (history.length === 0) return; // Nothing to rewind
+      const lastAction = history.pop(); // Get the last action
+      const card = document.createElement('article'); // Create a new card element
+      card.className = 'card';
+      card.innerHTML = `
+        <div class="badge like">LIKE</div>
+        <div class="badge pass">PASS</div>
+        <img alt="${lastAction.caption}" src="${lastAction.src}" />
+        <div class="gradient" aria-hidden="true"></div>
+        <div class="meta">
+          <div>
+            <div class="title">${lastAction.caption}</div>
+            <div class="index-pill">${lastAction.index + 1} / ${photos.length}</div>
+          </div>
+        </div>`;
+      deckEl.appendChild(card); // Add the card back to the deck
+      attachTopCard(); // Attach the swipe functionality to the new top card
+      updateDots(); // Update the dots
+    }
+
+    // Initialize the deck on page load
+    buildDeck();
+  </script>
+</body>
+</html>
+                                                    
