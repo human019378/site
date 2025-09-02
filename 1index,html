@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Photo Swipe Gallery</title>
+  <style>
+    body {
+      margin: 0;
+      background: linear-gradient(135deg, #fdfbfb, #ebedee);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      overflow: hidden;
+      font-family: sans-serif;
+    }
+    #app {
+      position: relative;
+      width: 90%;
+      max-width: 400px;
+      height: 80vh;
+    }
+    .card {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      background: #fff;
+      border-radius: 20px;
+      box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+      background-size: cover;
+      background-position: center;
+      display: flex;
+      justify-content: flex-end;
+      align-items: flex-start;
+      flex-direction: column;
+      overflow: hidden;
+      transition: transform 0.3s ease, opacity 0.3s ease;
+    }
+    .caption {
+      width: 100%;
+      background: rgba(0,0,0,0.5);
+      color: white;
+      padding: 10px;
+      box-sizing: border-box;
+      font-size: 14px;
+    }
+    #dots {
+      position: absolute;
+      bottom: -30px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 6px;
+    }
+    .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #ccc;
+    }
+    .dot.active {
+      background: #333;
+    }
+    #rewind {
+      position: absolute;
+      top: -40px;
+      right: 0;
+      background: #333;
+      color: white;
+      border: none;
+      border-radius: 20px;
+      padding: 5px 10px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <button id="rewind">⟲ Rewind</button>
+    <div id="deck"></div>
+    <div id="dots"></div>
+  </div>
+  <script>
+    // --- Configuration ------------------------------------------------------
+    const photos = [
+      "https://i.postimg.cc/cHSHz1y8/F6-E50-FBB-A7-F1-4-BB7-B1-CA-834-E81-BED127.png",
+      "https://i.postimg.cc/0j5N8tNk/IMG-0075.jpg",
+      "https://i.postimg.cc/cHBHGq0k/IMG-0128.jpg",
+      "https://i.postimg.cc/kGjgDxVx/IMG-0240.jpg",
+      "https://i.postimg.cc/sfKXnRnv/IMG-0265.jpg",
+      "https://i.postimg.cc/CLQKgsp0/IMG-0287.jpg",
+      "https://i.postimg.cc/RZJZVJvH/IMG-0299.jpg",
+      "https://i.postimg.cc/Prxq9FcK/IMG-0266-Copy.jpg",
+      "https://i.postimg.cc/Lsd6q4s0/IMG-0422.jpg",
+      "https://i.postimg.cc/W3TNn9gG/IMG-0516-Copy.jpg",
+      "https://i.postimg.cc/XJLVDwkT/IMG-0644.jpg",
+      "https://i.postimg.cc/T1HTTfS0/IMG-8844.jpg",
+      "https://i.postimg.cc/Y0SpchXj/IMG-8954.jpg",
+      "https://i.postimg.cc/mZdLYyD9/IMG-9409.jpg",
+      "https://i.postimg.cc/9FrWJwRn/IMG-9919.jpg"
+    ];
+
+    // Optional captions (same length as photos). Leave empty strings to hide.
+    const captions = [
+      "Photo 1","Photo 2","Photo 3","Photo 4","Photo 5",
+      "Photo 6","Photo 7","Photo 8","Photo 9","Photo 10",
+      "Photo 11","Photo 12","Photo 13","Photo 14","Photo 15"
+    ];
+
+    // --- Core swipe deck logic ---------------------------------------------
+    const deckEl = document.getElementById('deck');
+    const dotsEl = document.getElementById('dots');
+    const rewindBtn = document.getElementById('rewind');
+    let history = []; // stack of removed cards for rewind
+
+    function createDots(count){
+      dotsEl.innerHTML = '';
+      for(let i=0;i<count;i++){
+        const d = document.createElement('div');
+        d.className = 'dot' + (i===0?' active':'');
+        dotsEl.appendChild(d);
+      }
+    }
+
+    function updateDots(){
+      const cards = [...deckEl.children];
+      const topIndex = photos.length - cards.length; // 0-based index of current
+      [...dotsEl.children].forEach((dot, i)=>{
+        dot.classList.toggle('active', i === topIndex);
+      });
+    }
+
+    function createCard(photo, caption){
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.style.backgroundImage = `url(${photo})`;
+      if (caption) {
+        const cap = document.createElement('div');
+        cap.className = 'caption';
+        cap.textContent = caption;
+        card.appendChild(cap);
+      }
+      enableSwipe(card);
+      return card;
+    }
+
+    function enableSwipe(card){
+      let startX=0, currentX=0, dragging=false;
+      card.addEventListener('touchstart', e=>{
+        startX = e.touches[0].clientX;
+        dragging = true;
+        card.style.transition = 'none';
+      });
+      card.addEventListener('touchmove', e=>{
+        if(!dragging) return;
+        currentX = e.touches[0].clientX - startX;
+        card.style.transform = `translateX(${currentX}px) rotate(${currentX/20}deg)`;
+      });
+      card.addEventListener('touchend', ()=>{
+        dragging=false;
+        card.style.transition = 'transform 0.3s ease, opacity 0.3s ease';
+        if(Math.abs(currentX) > 100){
+          card.style.transform = `translateX(${Math.sign(currentX)*1000}px) rotate(${currentX/10}deg)`;
+          card.style.opacity = 0;
+          setTimeout(()=>{
+            if(card.parentElement){
+              deckEl.removeChild(card);
+              history.push(card);
+              updateDots();
+            }
+          },300);
+        } else {
+          card.style.transform = '';
+        }
+        currentX=0;
+      });
+    }
+
+    function init(){
+      deckEl.innerHTML='';
+      for(let i=photos.length-1;i>=0;i--){
+        const card = createCard(photos[i], captions[i]);
+        deckEl.appendChild(card);
+      }
+      createDots(photos.length);
+      updateDots();
+    }
+
+    rewindBtn.addEventListener('click', ()=>{
+      const last = history.pop();
+      if(last){
+        deckEl.appendChild(last);
+        last.style.opacity = 1;
+        last.style.transform = '';
+        updateDots();
+      }
+    });
+
+    init();
+  </script>
+</body>
+</html>
